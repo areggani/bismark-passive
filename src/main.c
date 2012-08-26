@@ -45,11 +45,18 @@
 #include "http_parser.h"
 #include "http_table.h"
 #endif
+#ifdef ENABLE_PACKET_SEQACK  /* AHLEM */
+#include "packet_seqack.h"
+#endif
+#ifdef ENABLE_FLOW_FLAGS  /* AHLEM didnt modify the main body for flow_flag*/
+#include "flow_flag.h"
+#endif
 #include "flow_table.h"
 #include "packet_series.h"
 #include "upload_failures.h"
 #include "util.h"
 #include "whitelist.h"
+
 
 static pcap_t* pcap_handle = NULL;
 
@@ -58,6 +65,12 @@ static flow_table_t flow_table;
 static dns_table_t dns_table;
 #ifdef ENABLE_HTTP_URL
 static http_table_t http_table;
+#endif
+#ifdef ENABLE_PACKET_SEQACK 
+static packet_flag_t packet_flag;
+#endif
+#ifdef ENABLE_FLOW
+static flow_flag_t flow_flag;
 #endif
 
 static address_table_t address_table;
@@ -103,10 +116,13 @@ static uint16_t get_flow_entry_for_packet(
     int cap_length,
     int full_length,
     flow_table_entry_t* const entry,
+	#ifdef ENABLE_FLOW
+    flow_flag_entry_t* const fentry
+	#endif									  
     int* const mac_id,
     u_char** const dns_bytes,
     int* const dns_bytes_len
-#ifdef ENABLE_HTTP_URL
+#ifdef ENABLE_HTTP_URL        
     ,u_char ** const http_bytes,
     int* const http_bytes_len
 #endif
@@ -137,14 +153,18 @@ static uint16_t get_flow_entry_for_packet(
           (void *)ip_header + ip_header->ihl * sizeof(uint32_t));
       entry->port_source = ntohs(tcp_header->source);
       entry->port_destination = ntohs(tcp_header->dest);
-#ifdef ENABLE_HTTP_URL
-      if(entry->port_destination ==80 )
-      {
-       int hlen = tcp_header->doff*4;
+#ifdef ENABLE_HTTP_URL        
+      if(entry->port_destination ==80 ) 
+      { 
+       int hlen = tcp_header->doff*4; 
        if (hlen>sizeof(*tcp_header)) hlen=hlen-sizeof(*tcp_header);
        * http_bytes = (u_char*)tcp_header + sizeof(struct tcphdr) + hlen;
        * http_bytes_len = cap_length - (*http_bytes - bytes);
-      }
+      }                   
+#endif
+#ifdef ENABLE_PACKET_SEQACK 
+entry->th_seq = tcp_header->seq;
+entry->th_ack = tcp_header->ack;		
 #endif
     } else if (ip_header->protocol == IPPROTO_UDP) {
       const struct udphdr* udp_header = (struct udphdr*)(
@@ -201,13 +221,13 @@ static void process_packet(
   int mac_id = -1;
   u_char* dns_bytes = NULL;
   int dns_bytes_len = -1;
-#ifdef ENABLE_HTTP_URL
+#ifdef ENABLE_HTTP_URL        
   u_char* http_bytes = NULL;
   int http_bytes_len = -1;
 #endif
   int ether_type = get_flow_entry_for_packet(
-      bytes, header->caplen, header->len, &flow_entry, &mac_id, &dns_bytes, &dns_bytes_len
-#ifdef ENABLE_HTTP_URL
+      bytes, header->caplen, header->len, &flow_entry, &mac_id, &dns_bytes, &dns_bytes_len 
+#ifdef ENABLE_HTTP_URL        
       , &http_bytes, &http_bytes_len
 #endif
       );
@@ -247,7 +267,7 @@ static void process_packet(
       flow_id = FLOW_ID_ERROR;
       break;
   }
-
+    
   int packet_id = packet_series_add_packet(
         &packet_data, &header->ts, header->len, flow_id);
   if (packet_id < 0) {
@@ -255,14 +275,15 @@ static void process_packet(
     drop_statistics_process_packet(&drop_statistics, header->len);
   }
 
-  if (dns_bytes_len > 0 && mac_id >= 0 && packet_id >= 0) {
+  if (dns_bytes_len > 0 && mac_id >= 0) {
     process_dns_packet(dns_bytes, dns_bytes_len, &dns_table, packet_id, mac_id);
   }
-#ifdef ENABLE_HTTP_URL
+#ifdef ENABLE_HTTP_URL        
   if (http_bytes_len > 0) {
     process_http_packet(http_bytes, http_bytes_len, & http_table, flow_id);
   }
 #endif
+#RAJOUTER seq ack flag parametres la 	
   if (sigprocmask(SIG_UNBLOCK, &block_set, NULL) < 0) {
     perror("sigprocmask");
     exit(1);
@@ -353,11 +374,17 @@ static void write_update() {
   }
 #endif
   if (packet_series_write_update(&packet_data, handle)
+#ifdef ENABLE_PACKET_SEQACK  /* AHLEM */
+	  || packet_seqack_write_update(&packet_data, handle) 
+#endif	  
       || flow_table_write_update(&flow_table, handle)
+#ifdef ENABLE_PACKET_SEQACK
+	  || flow_flag_write_update(&flow_flag,handle)	
+#endif
       || dns_table_write_update(&dns_table, handle)
       || address_table_write_update(&address_table, handle)
       || drop_statistics_write_update(&drop_statistics, handle)
-#ifdef ENABLE_HTTP_URL
+#ifdef ENABLE_HTTP_URL        
       || http_table_write_update(&http_table, handle)
 #endif
       ) {
@@ -383,10 +410,13 @@ static void write_update() {
   flow_table_advance_base_timestamp(&flow_table, current_timestamp);
   dns_table_destroy(&dns_table);
   dns_table_init(&dns_table, &domain_whitelist);
-#ifdef ENABLE_HTTP_URL
+#ifdef ENABLE_HTTP_URL        
   http_table_destroy(&http_table);
   http_table_init(&http_table);
 #endif
+#ifdef ENABLE_PACKET_SEQACK
+  packet_seqack_init(&packet_seqack) /* AHLEM */	
+#endif	
   drop_statistics_init(&drop_statistics);
 }
 

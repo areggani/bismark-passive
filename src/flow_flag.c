@@ -8,51 +8,42 @@
 #include <sys/time.h>
 
 #include "anonymization.h"
-#include "constants.h"  /*AHLEM should define flow_flag_entries? in constants.h*/
+#include "constants.h"  
 #include "hashing.h"
 
-/*#ifdef TESTING
+#ifdef TESTING
 static uint32_t (*alternate_hash_function)(const char* data, int len) = NULL;
 #endif
-*/
+
 static int flow_entry_compare(const flow_flag_entry_t* const first,
                               const flow_flag_entry_t* const second) {
-  return /*first->ip_source == secosnd->ip_source
-      && first->ip_destination == second->ip_destination
-      && first->transport_protocol == second->transport_protocol
-      && first->port_source == second->port_source
-	&& first->port_destination == second->port_destination*/
-	#ifdef FLOW_FLAGS 	
-	 first->th_flags == second->th_flags; /*AHLEM tcp flags*/
-	#endif	
-	}
+  return first->th_flags == second->th_flags; 	}
 
 void flow_flag_init(flow_flag_t* const flag) {
-  memset(flag->entries, '\0', sizeof(*flag));
+  memset(flag->entries, '\0', sizeof(flag));
 }
 
-/*void flow_table_entry_init(flow_table_entry_t* const entry) {
-  memset(entry, '\0', sizeof(*entry));
-}*/
+void flow_flag_entry_init(flow_flag_entry_t* const fentry) {
+  memset(entry, '\0', sizeof(*fentry));
+}
 
 int flow_flag_process_flow(flow_flag_t* const flag,
-                            flow_flag_entry_t* const new_entry,
+                            flow_flag_entry_t* const new_fentry,
                             time_t timestamp_seconds) {
   const int hash_size = 
-                       #ifdef FLOW_FLAGS
-	                   sizeof(new_entry->th_flags); /*AHLEM tcp flags*/
-					   #endif
-	                  /*sizeof(new_entry->ip_source)
+					   sizeof(new_fentry->th_flags); 
+				
+	                  +sizeof(new_entry->ip_source)
                       + sizeof(new_entry->ip_destination)
                       + sizeof(new_entry->port_source)
                       + sizeof(new_entry->port_destination)
 	                  + sizeof(new_entry->transport_protocol);*/
 	                   
 
-	uint32_t hash = fnv_hash_32((char *)new_entry, hash_size);
+	uint32_t hash = fnv_hash_32((char *)new_fentry, hash_size);
 #ifdef TESTING
   if (alternate_hash_function) {
-    hash = alternate_hash_function((char *)new_entry, sizeof(*new_entry));
+    hash = alternate_hash_function((char *)new_fentry, sizeof(*new_fentry));
   }
 #endif
 
