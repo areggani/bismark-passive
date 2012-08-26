@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <zlib.h>   
+#include <netinet/tcp.h>
 
 #include "constants.h" 
 

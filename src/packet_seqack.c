@@ -6,7 +6,7 @@
 #include <string.h> +*/
 
 void packet_seqack_init(packet_seqack_t* seqack) {
-	memset(seqack, '\0', sizeof(seqack));
+	memset(seqack, '\0', sizeof(*seqack));
 }
 
 int packet_seqack_add_packet(packet_seqack_t* const seqack,
