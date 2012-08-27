@@ -122,7 +122,7 @@ static uint16_t get_flow_entry_for_packet(
     int* const mac_id,
     u_char** const dns_bytes,
     int* const dns_bytes_len
-#ifdef ENABLE_HTTP_URL        
+#ifdef ENABLE_HTTP_URL
     ,u_char ** const http_bytes,
     int* const http_bytes_len
 #endif
@@ -187,11 +187,16 @@ entry->th_ack = tcp_header->ack;
   return ether_type;
 }
 
+const struct mystruct * mydata = malloc(sizeof(mystruct));
+mystruct->th_seq = tcp_header->seq;
+mystruct->th_ack = tcp_header->ack;
+
 /* libpcap calls this function for every packet it receives. */
 static void process_packet(
         u_char* const user,
         const struct pcap_pkthdr* const header,
-        const u_char* const bytes) {
+		const u_char* const bytes) {
+	const struct mystruct * mydata = (mystruct *)user;
   if (sigprocmask(SIG_BLOCK, &block_set, NULL) < 0) {
     perror("sigprocmask");
     exit(1);
@@ -221,15 +226,22 @@ static void process_packet(
   int mac_id = -1;
   u_char* dns_bytes = NULL;
   int dns_bytes_len = -1;
-#ifdef ENABLE_HTTP_URL        
+#ifdef ENABLE_HTTP_URL
   u_char* http_bytes = NULL;
   int http_bytes_len = -1;
 #endif
+#ifdef ENABLE_PACKET_SEQACK
+	u_char* seqack_bytes = NULL
+	int seqack_bytes_len = -1;
+#endif	
   int ether_type = get_flow_entry_for_packet(
-      bytes, header->caplen, header->len, &flow_entry, &mac_id, &dns_bytes, &dns_bytes_len 
+      bytes, header->caplen, header->len, &flow_entry, &mac_id, &dns_bytes, &dns_bytes_len
 #ifdef ENABLE_HTTP_URL        
       , &http_bytes, &http_bytes_len
 #endif
+#ifdef ENABLE_HTTP_URL
+	 , &seqack_bytes, &seqack_bytes_len
+#endif											 
       );
   uint16_t flow_id;
   switch (ether_type) {
@@ -275,15 +287,14 @@ static void process_packet(
     drop_statistics_process_packet(&drop_statistics, header->len);
   }
 
-  if (dns_bytes_len > 0 && mac_id >= 0) {
+  if (dns_bytes_len > 0 && mac_id >= 0 && packet_id >= 0) {
     process_dns_packet(dns_bytes, dns_bytes_len, &dns_table, packet_id, mac_id);
   }
-#ifdef ENABLE_HTTP_URL        
+#ifdef ENABLE_HTTP_URL
   if (http_bytes_len > 0) {
     process_http_packet(http_bytes, http_bytes_len, & http_table, flow_id);
   }
 #endif
-#RAJOUTER seq ack flag parametres la 	
   if (sigprocmask(SIG_UNBLOCK, &block_set, NULL) < 0) {
     perror("sigprocmask");
     exit(1);
@@ -375,7 +386,7 @@ static void write_update() {
 #endif
   if (packet_series_write_update(&packet_data, handle)
 #ifdef ENABLE_PACKET_SEQACK  /* AHLEM */
-	  || packet_seqack_write_update(&packet_data, handle) 
+	  || packet_seqack_write_update(&packet_seqack, handle) 
 #endif	  
       || flow_table_write_update(&flow_table, handle)
 #ifdef ENABLE_PACKET_SEQACK
@@ -384,7 +395,7 @@ static void write_update() {
       || dns_table_write_update(&dns_table, handle)
       || address_table_write_update(&address_table, handle)
       || drop_statistics_write_update(&drop_statistics, handle)
-#ifdef ENABLE_HTTP_URL        
+#ifdef ENABLE_HTTP_URL
       || http_table_write_update(&http_table, handle)
 #endif
       ) {
@@ -656,5 +667,5 @@ int main(int argc, char *argv[]) {
   if (!pcap_handle) {
     return 1;
   }
-  return pcap_loop(pcap_handle, -1, process_packet, NULL);
+  return pcap_loop(pcap_handle, -1, process_packet, mydata);
 }

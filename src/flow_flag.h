@@ -25,13 +25,6 @@ void flow_flag_init(flow_flag_t* const flag);
 
 void flow_flag_entry_init(flow_flag_entry_t* const fentry);
 
-/* Add a flow to the hash table if it doesn't already exist. Does not claim
- * ownership of entry or timestamp. If expired entries are encountered in the
- * process, then delete them. Return the offset table index of the new flow or
- * FLOW_ID_ERROR if no space was available. */
-/*int flow_flag_process_flow(flow_flag_t* const flag,
-                            flow_flag_entry_t* const fentry,
-                            time_t timestamp_seconds);*/
 
 /* Advance the base timestamp to a new value. This will rewrite offsets of
  * existing flows to match the new base timestamp, which can cause flows to be

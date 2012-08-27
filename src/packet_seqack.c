@@ -21,18 +21,8 @@ int packet_seqack_add_packet(packet_seqack_t* const seqack,
 		return -1;
 	}
 	
-	/*int64_t current_timestamp_microseconds
-	= timestamp->tv_sec * NUM_MICROS_PER_SECOND + timestamp->tv_usec;
-	/*if (seqack->length == 0) {
-		seqack->start_time_microseconds = current_timestamp_microseconds;
-		seqack->packet_seqack[seqack->length].timestamp = 0;
-	} else {
-		seqack->packet_seqack[seqack->length].timestamp
-		= current_timestamp_microseconds - series->last_time_microseconds;
-	}*/
 	seqack->packet_seqack[seqack->length].th_seq = th_seq;
 	seqack->packet_seqack[seqack->length].th_ack = th_ack;
-	/*series->last_time_microseconds = current_timestamp_microseconds;*/
 	++seqack->length;
 	
 	return seqack->length - 1;
