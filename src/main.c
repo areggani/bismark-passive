@@ -187,16 +187,16 @@ entry->th_ack = tcp_header->ack;
   return ether_type;
 }
 
-const struct mystruct * mydata = malloc(sizeof(mystruct));
-mystruct->th_seq = tcp_header->seq;
-mystruct->th_ack = tcp_header->ack;
+const struct seqackstruct * mydata = malloc(sizeof(seqackstruct));
+seqackstruct->th_seq = tcp_header->seq;
+seqackstruct->th_ack = tcp_header->ack;
 
 /* libpcap calls this function for every packet it receives. */
 static void process_packet(
         u_char* const user,
         const struct pcap_pkthdr* const header,
 		const u_char* const bytes) {
-	const struct mystruct * mydata = (mystruct *)user;
+	const struct seqackstruct * mydata = (seqackstruct *)user;
   if (sigprocmask(SIG_BLOCK, &block_set, NULL) < 0) {
     perror("sigprocmask");
     exit(1);

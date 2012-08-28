@@ -24,7 +24,7 @@
 typedef struct {
 				uint32_t th_seq;     /* tcp_seq sequence number */
 				uint32_t th_ack;     /* acknowledgement number */
-} mystruct;
+} seqackstruct;
 
 /*parameters*/
 mystruct->th_seq = tcp_header->seq;
