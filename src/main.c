@@ -45,12 +45,6 @@
 #include "http_parser.h"
 #include "http_table.h"
 #endif
-#ifdef ENABLE_PACKET_SEQACK  /* AHLEM */
-#include "packet_seqack.h"
-#endif
-#ifdef ENABLE_FLOW_FLAGS  /* AHLEM didnt modify the main body for flow_flag*/
-#include "flow_flag.h"
-#endif
 #include "flow_table.h"
 #include "packet_series.h"
 #include "upload_failures.h"
@@ -66,13 +60,6 @@ static dns_table_t dns_table;
 #ifdef ENABLE_HTTP_URL
 static http_table_t http_table;
 #endif
-#ifdef ENABLE_PACKET_SEQACK 
-static packet_flag_t packet_flag;
-#endif
-#ifdef ENABLE_FLOW
-static flow_flag_t flow_flag;
-#endif
-
 static address_table_t address_table;
 static domain_whitelist_t domain_whitelist;
 static drop_statistics_t drop_statistics;
@@ -116,10 +103,7 @@ static uint16_t get_flow_entry_for_packet(
     int cap_length,
     int full_length,
     flow_table_entry_t* const entry,
-	#ifdef ENABLE_FLOW
-    flow_flag_entry_t* const fentry
-	#endif									  
-    int* const mac_id,
+	int* const mac_id,
     u_char** const dns_bytes,
     int* const dns_bytes_len
 #ifdef ENABLE_HTTP_URL        
@@ -166,6 +150,9 @@ static uint16_t get_flow_entry_for_packet(
 entry->th_seq = tcp_header->seq;
 entry->th_ack = tcp_header->ack;		
 #endif
+#ifdef ENABLE_FLOW_FLAG		
+entry->th_flags = tcp_header->th_flags;		
+#endif		
     } else if (ip_header->protocol == IPPROTO_UDP) {
       const struct udphdr* udp_header = (struct udphdr*)(
           (void *)ip_header + ip_header->ihl * sizeof(uint32_t));
@@ -283,7 +270,6 @@ static void process_packet(
     process_http_packet(http_bytes, http_bytes_len, & http_table, flow_id);
   }
 #endif
-#RAJOUTER seq ack flag parametres la 	
   if (sigprocmask(SIG_UNBLOCK, &block_set, NULL) < 0) {
     perror("sigprocmask");
     exit(1);
@@ -374,13 +360,7 @@ static void write_update() {
   }
 #endif
   if (packet_series_write_update(&packet_data, handle)
-#ifdef ENABLE_PACKET_SEQACK  /* AHLEM */
-	  || packet_seqack_write_update(&packet_data, handle) 
-#endif	  
       || flow_table_write_update(&flow_table, handle)
-#ifdef ENABLE_PACKET_SEQACK
-	  || flow_flag_write_update(&flow_flag,handle)	
-#endif
       || dns_table_write_update(&dns_table, handle)
       || address_table_write_update(&address_table, handle)
       || drop_statistics_write_update(&drop_statistics, handle)
@@ -414,9 +394,6 @@ static void write_update() {
   http_table_destroy(&http_table);
   http_table_init(&http_table);
 #endif
-#ifdef ENABLE_PACKET_SEQACK
-  packet_seqack_init(&packet_seqack) /* AHLEM */	
-#endif	
   drop_statistics_init(&drop_statistics);
 }
 

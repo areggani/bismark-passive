@@ -18,6 +18,10 @@ typedef struct {
   uint16_t size;
   /* Index into the flow table. -1 means no flow information is available. */
   uint16_t flow;
+	#ifdef ENABLE_PACKET_SEQACK
+	uint32_t th_seq;     /* tcp_seq sequence number */
+	uint32_t th_ack;     /* acknowledgement number */
+	#endif	
 } packet_data_t;
 
 /** A data structure for storing information about series of packets. For space

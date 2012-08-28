@@ -15,7 +15,9 @@ typedef struct {
   uint16_t port_source;
   uint16_t port_destination;
   uint8_t transport_protocol;
-
+	#ifdef ENABLE_FLOW_FLAG
+	uint8_t th_flags;
+	#endif
   /* These fields will not be taken into account for hashing */
   uint8_t occupied : 2;
 #define ENTRY_EMPTY                  0

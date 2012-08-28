@@ -31,7 +31,11 @@ int packet_series_add_packet(
   }
   series->packet_data[series->length].size = size;
   series->packet_data[series->length].flow = flow;
-  series->last_time_microseconds = current_timestamp_microseconds;
+	#ifdef ENABLE_PACKET_SEQACK
+	series->packet_data[series->length].th_seq = th_seq;
+	series->packet_data[series->length].th_ack = th_ack;
+	#endif
+	series->last_time_microseconds = current_timestamp_microseconds;
   ++series->length;
 
   return series->length - 1;
@@ -56,6 +60,10 @@ int packet_series_write_update(const packet_series_t* const series,
                   "%" PRId32 " %" PRIu16 " %d\n",
                   series->packet_data[idx].timestamp,
                   series->packet_data[idx].size,
+					#ifdef ENABLE_PACKET_SEQACK
+				  series->packet_data[idx].th_seq,
+				  series->packet_data[idx].th_ack,
+					#endif
                   flow_id)) {
       perror("Error writing update");
       return -1;

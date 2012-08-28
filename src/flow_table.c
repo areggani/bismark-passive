@@ -20,7 +20,10 @@ static int flow_entry_compare(const flow_table_entry_t* const first,
       && first->ip_destination == second->ip_destination
       && first->transport_protocol == second->transport_protocol
       && first->port_source == second->port_source
-      && first->port_destination == second->port_destination;
+      && first->port_destination == second->port_destination
+		#ifdef ENABLE_FLOW_FLAG
+		&& first->th_flags == second->th_flags;
+		#endif
 }
 
 void flow_table_init(flow_table_t* const table) {
@@ -38,7 +41,10 @@ int flow_table_process_flow(flow_table_t* const table,
                       + sizeof(new_entry->ip_destination)
                       + sizeof(new_entry->port_source)
                       + sizeof(new_entry->port_destination)
-                      + sizeof(new_entry->transport_protocol);
+                      + sizeof(new_entry->transport_protocol)
+						#ifdef ENABLE_FLOW_FLAG
+						+ sizeof(new_entry->th_flags);
+						#endif
   uint32_t hash = fnv_hash_32((char *)new_entry, hash_size);
 #ifdef TESTING
   if (alternate_hash_function) {
@@ -181,7 +187,11 @@ int flow_table_write_update(flow_table_t* const table, gzFile handle) {
             destination_digest,
             table->entries[idx].transport_protocol,
             table->entries[idx].port_source,
-            table->entries[idx].port_destination)) {
+            table->entries[idx].port_destination,
+			#ifdef ENABLE_FLOW_FLAG
+			table->entries[idx].th_flags
+			#endif 
+					)) {
         perror("Error sending update");
         return -1;
       }
