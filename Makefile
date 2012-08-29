@@ -34,6 +34,12 @@ endif
 ifdef ENABLE_HTTP_URL
 CFLAGS += -DENABLE_HTTP_URL
 endif
+ifdef ENABLE_PACKET_SEQACK
+CFLAGS += -DENABLE_PACKET_SEQACK
+endif
+ifdef ENABLE_FLOW_FLAGS
+CFLAGS += -DENABLE_FLOW_FLAGS
+endif
 
 SRCS = \
 	$(SRC_DIR)/address_table.c \
@@ -45,8 +51,10 @@ SRCS = \
 	$(SRC_DIR)/http_table.c \
 	$(SRC_DIR)/drop_statistics.c \
 	$(SRC_DIR)/flow_table.c \
+	$(SRC_DIR)/flow_flag.c \
 	$(SRC_DIR)/main.c \
 	$(SRC_DIR)/packet_series.c \
+	$(SRC_DIR)/packet_seqack.c \
 	$(SRC_DIR)/sha1.c \
 	$(SRC_DIR)/upload_failures.c \
 	$(SRC_DIR)/util.c \

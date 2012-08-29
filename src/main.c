@@ -45,10 +45,12 @@
 #include "http_parser.h"
 #include "http_table.h"
 #endif
-#ifdef ENABLE_PACKET_SEQACK  /* AHLEM */
+#ifdef ENABLE_PACKET_SEQACK  
+#include "seqack_parser.h"
 #include "packet_seqack.h"
 #endif
-#ifdef ENABLE_FLOW_FLAGS  /* AHLEM didnt modify the main body for flow_flag*/
+#ifdef ENABLE_FLOW_FLAGS 
+#include "flag_parser.h"
 #include "flow_flag.h"
 #endif
 #include "flow_table.h"
@@ -67,10 +69,10 @@ static dns_table_t dns_table;
 static http_table_t http_table;
 #endif
 #ifdef ENABLE_PACKET_SEQACK 
-static packet_flag_t packet_flag;
+static seqack_table_t seqack_table;
 #endif
 #ifdef ENABLE_FLOW
-static flow_flag_t flow_flag;
+static flag_table_t flag_table;
 #endif
 
 static address_table_t address_table;
@@ -116,16 +118,23 @@ static uint16_t get_flow_entry_for_packet(
     int cap_length,
     int full_length,
     flow_table_entry_t* const entry,
-	#ifdef ENABLE_FLOW
-    flow_flag_entry_t* const fentry
-	#endif									  
-    int* const mac_id,
+	int* const mac_id,
     u_char** const dns_bytes,
     int* const dns_bytes_len
 #ifdef ENABLE_HTTP_URL
     ,u_char ** const http_bytes,
     int* const http_bytes_len
 #endif
+#ifdef ENABLE_PACKET_SEQACK 
+	,u_char** const seq_bytes,
+	int* const seq_bytes_len,
+	u_char** const ack_bytes,
+	int* const ack_bytes_len									  
+#ifdef ENABLE_FLOW
+	,u_char** const flag_bytes,
+	int* const flag_bytes_len									  
+#endif												  
+										  
 ) {
   const struct ether_header* const eth_header = (struct ether_header*)bytes;
   uint16_t ether_type = ntohs(eth_header->ether_type);
@@ -148,6 +157,7 @@ static uint16_t get_flow_entry_for_packet(
         &address_table, entry->ip_source, eth_header->ether_shost);
     address_table_lookup(
         &address_table, entry->ip_destination, eth_header->ether_dhost);
+	  /*PUT FLAG PROCESSING AFTER HERE AHLEM*/
     if (ip_header->protocol == IPPROTO_TCP) {
       const struct tcphdr* tcp_header = (struct tcphdr*)(
           (void *)ip_header + ip_header->ihl * sizeof(uint32_t));
@@ -231,16 +241,26 @@ static void process_packet(
   int http_bytes_len = -1;
 #endif
 #ifdef ENABLE_PACKET_SEQACK
-	u_char* seqack_bytes = NULL
-	int seqack_bytes_len = -1;
+	u_char* seq_bytes = 0;
+	int seq_bytes_len = 0;
+	u_char* seq_bytes = 0;
+	int seq_bytes_len = 0;
 #endif	
+#ifdef ENABLE_FLOW_FLAGS
+	u_char* flag_bytes = NULL;
+	int flag_bytes_len = -1;
+#endif
   int ether_type = get_flow_entry_for_packet(
       bytes, header->caplen, header->len, &flow_entry, &mac_id, &dns_bytes, &dns_bytes_len
 #ifdef ENABLE_HTTP_URL        
       , &http_bytes, &http_bytes_len
 #endif
-#ifdef ENABLE_HTTP_URL
-	 , &seqack_bytes, &seqack_bytes_len
+#ifdef ENABLE_FLOW_FLAGS        
+	, &flag_bytes, &flag_bytes_len
+#endif
+#ifdef ENABLE_PACKET_SEQACK
+	 , &seq_bytes, &seq_bytes_len,
+	, &ack_bytes, &ack_bytes_len
 #endif											 
       );
   uint16_t flow_id;
@@ -279,6 +299,7 @@ static void process_packet(
       flow_id = FLOW_ID_ERROR;
       break;
   }
+	
     
   int packet_id = packet_series_add_packet(
         &packet_data, &header->ts, header->len, flow_id);
@@ -295,6 +316,20 @@ static void process_packet(
     process_http_packet(http_bytes, http_bytes_len, & http_table, flow_id);
   }
 #endif
+#ifdef ENABLE_PACKET_SEQACK
+	if (seq_bytes_len > 0 && packet_id >= 0) {
+		process_seq_packet(seq_bytes, seq_bytes_len, &seqack_table, packet_id);
+	}
+	if (ack_bytes_len > && packet_id >= 0) {
+		process_ack_packet(ack_bytes, ack_bytes_len, &seqack_table, packet_id);
+	}
+#endif
+#ifdef ENABLE_FLOW_FLAGS
+	if (flag_bytes_len > 0) {
+		process_flag_packet(flag_bytes, flag_bytes_len, &flag_table, flow_id);
+	}
+#endif
+/*put the code to logically AND the flags somewhere around line 268 AHLEM*/
   if (sigprocmask(SIG_UNBLOCK, &block_set, NULL) < 0) {
     perror("sigprocmask");
     exit(1);
@@ -385,12 +420,12 @@ static void write_update() {
   }
 #endif
   if (packet_series_write_update(&packet_data, handle)
-#ifdef ENABLE_PACKET_SEQACK  /* AHLEM */
-	  || packet_seqack_write_update(&packet_seqack, handle) 
+#ifdef ENABLE_PACKET_SEQACK  
+	  || seqack_table_write_update(&packet_seqack, handle) 
 #endif	  
       || flow_table_write_update(&flow_table, handle)
-#ifdef ENABLE_PACKET_SEQACK
-	  || flow_flag_write_update(&flow_flag,handle)	
+#ifdef ENABLE_FLOW_FLAGS
+	  || flag_table_write_update(&flow_flag,handle)	
 #endif
       || dns_table_write_update(&dns_table, handle)
       || address_table_write_update(&address_table, handle)
@@ -424,10 +459,15 @@ static void write_update() {
 #ifdef ENABLE_HTTP_URL        
   http_table_destroy(&http_table);
   http_table_init(&http_table);
-#endif
-#ifdef ENABLE_PACKET_SEQACK
-  packet_seqack_init(&packet_seqack) /* AHLEM */	
 #endif	
+#ifdef ENABLE_PACKET_SEQACK
+	seqack_table_destroy(&seqack_table);
+	seqack_table_init(&seqack_table); 	
+#endif	
+#ifdef ENABLE_FLOW_FLAGS
+	flag_table_destroy(&flag_table);
+	flag_table_init(&flag_table);	
+#ifdef	
   drop_statistics_init(&drop_statistics);
 }
 
@@ -646,6 +686,13 @@ int main(int argc, char *argv[]) {
 #ifdef ENABLE_HTTP_URL
   http_table_init(&http_table);
 #endif
+#ifdef ENABLE_PACKET_SEQACK
+	seqack_table_init(&seqack_table); 	
+#endif	
+#ifdef ENABLE_FLOW_FLAGS
+	flag_table_init(&flag_table);	
+#ifdef	
+	
   address_table_init(&address_table);
   drop_statistics_init(&drop_statistics);
 #ifdef ENABLE_FREQUENT_UPDATES

@@ -10,7 +10,6 @@
 #ifndef _BISMARK_PASSIVE_PACKET_SEQACK_H_
 #define _BISMARK_PASSIVE_PACKET_SEQACK_H_
 
-/*typedef	u_int32_t tcp_seq;*/
 
 #include <stdint.h>  
 #include <stdio.h>
@@ -22,32 +21,31 @@
 
 /* Information about a single packet. */
 typedef struct {
+				uint16_t packet_id;
 				uint32_t th_seq;     /* tcp_seq sequence number */
 				uint32_t th_ack;     /* acknowledgement number */
-} seqackstruct;
+} seqack_entry_t;
 
-/*parameters*/
-mystruct->th_seq = tcp_header->seq;
-mystruct->th_ack = tcp_header->ack;
 
 typedef struct{
 	
-	int32_t timestamp;
-	mystruct seqack[SEQACK_TABLE_ENTRIES];
+	uint16_t packet_id;
+	seqack_entry_t entries[SEQACK_TABLE_ENTRIES];
+	int length
+	int num_dropped_entries;
 
-}packet_seqack_t
+}seqack_table_t
 
-void packet_seqack_init(packet_seqack_t* const seqack);
+void seqack_table_init(seqack_table_t* const table);
 
-/* Add a packet to the end of the packet series. t*/
-int packet_seqack_add_packet(
-							 packet_seqack_t* const packet_seqack,
-							 const struct timeval* const timestamp,
-							 int flow_id,
-							 uint32_t th_seq,
- 							 uint32_t th_ack);
+/*look dns_table.h*/
+void seqack_table_destroy(seqack_table_t* const table);
 
-/* Serialize all time series entries to an open gzFile handle. */
-int packet_seqack_write_update(const packet_seqack_t const seqack, gzFile handle); 
+/*Add a new seqack_entry record to the table */
+int seqack_table_add(seqack_table_t* const table, seqack_entry_t* const entry);
+
+
+/* Serialize all table data to an open gzFile handle. */
+int seqack_table_write_update(const seqack_table_t const table, gzFile handle); 
 
 #endif

@@ -7,6 +7,7 @@
 #include <zlib.h>
 
 #include "constants.h"
+#include "flow_table.h"
 
 typedef struct { 
 	uint8_t th_flags;     
@@ -17,41 +18,18 @@ typedef struct {
 typedef struct {
 	
   flow_flag_entry_t entries[FLOW_FLAG_ENTRIES];
-   time_t base_timestamp_seconds;
-	
-  } flow_flag_t; 
+	int length;
+	int num_dropped_flag_entries;	
+  } flag_table_t; 
 
-void flow_flag_init(flow_flag_t* const flag);
+void flag_table_init(flag_table_t* const flag_table);
 
-void flow_flag_entry_init(flow_flag_entry_t* const fentry);
+/*look http_table.h*/
+void flag_table_destroy(flag_table_t* const flag_table);
+
+/*Add a new flag to the table*/
+int flag_table_add(flag_table_t* const flag_table, flow_flag_entry_t* const entry);
 
 
-/* Advance the base timestamp to a new value. This will rewrite offsets of
- * existing flows to match the new base timestamp, which can cause flows to be
- * deleted if the new base makes the offsets larger than INT16_MAX. */
-void flow_flag_advance_base_timestamp(flow_flag_t* const flag,
-                                       time_t new_timestamp);
-
-/* Write entries in the hash table that are marked ENTRY_OCCUPIED_BUT_UNSENT,
- * then update their state to ENTRY_OCCUPIED. This ensures each flow record is
- * only sent once. */
-int flow_flag_write_update(flow_flag_t* const flag, gzFile handle);
-
-#ifndef DISABLE_FLOW_THRESHOLDING
-/* Each flow maintains a count of the number of packets in that flow, up to the
- * first 64 packets. This function inspects these counts and writes the IP
- * addresses of the flow out to disk if it exceeds FLOW_THRESHOLD. This is only
- * done before the first update is prepared, to prevent redundant flows.
- *
- * This feature was added to support running active measurements
- * against the set of hosts accessed by the home network. */
-int flow_flag_write_thresholded_ips(const flow_flag_t* const flag,
-                                     const uint64_t session_id,
-                                     const int sequence_number);
-#endif
-
-#ifndef NDEBUG
-void testing_set_hash_function(uint32_t (*hasher)(const char* data, int len));
-#endif
-
-#endif
+/* Serialize all table data to an open gzFile handle. */
+int flag_table_write_update(flag_table_t* const flag_table, gzFile handle);
