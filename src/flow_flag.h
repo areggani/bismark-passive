@@ -24,9 +24,6 @@ typedef struct {
 
 void flag_table_init(flag_table_t* const flag_table);
 
-/*look http_table.h*/
-void flag_table_destroy(flag_table_t* const flag_table);
-
 /*Add a new flag to the table*/
 int flag_table_add(flag_table_t* const flag_table, flow_flag_entry_t* const entry);
 

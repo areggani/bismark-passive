@@ -29,7 +29,6 @@ typedef struct {
 
 typedef struct{
 	
-	uint16_t packet_id;
 	seqack_entry_t entries[SEQACK_TABLE_ENTRIES];
 	int length
 	int num_dropped_entries;
@@ -38,9 +37,7 @@ typedef struct{
 
 void seqack_table_init(seqack_table_t* const table);
 
-/*look dns_table.h*/
-void seqack_table_destroy(seqack_table_t* const table);
-
+/
 /*Add a new seqack_entry record to the table */
 int seqack_table_add(seqack_table_t* const table, seqack_entry_t* const entry);
 

@@ -16,12 +16,6 @@ void flag_table_init(flag_table_t* const flag_table) {
   memset(flag_table, '\0', sizeof(*flag_table));
 }
 
-void flag_table_destroy(flag_table_t* const flag_table) {
-	int idx;
-	for (idx = 0; idx < flag_table->length; ++idx) {
-		free(flag_table->entries[idx].th_flags);
-	}
-}
 
 int flag_table_add(flag_table_t* const flag_table,
 					   flow_flag_entry_t* const new_entry) {
@@ -43,10 +37,54 @@ int flag_table_write_update(flag_table_t* const flag_table, gzFile handle) {
 	}
 	int idx;
 	for (idx = 0; idx < flag_table->length; ++idx) {
+		//Actually you should think how
+		//to print out the flags, maybe
+		//encode the different flags
+		//with a letter:
+		//e.g.
+		//SYN=S,ACK=A,FIN=F,RST=R,Push=P,...
+		//Then a flow with SYN,ACK and
+		//FIN will be encoded as SAF
+		//AHLEM but the flag is 8bit int and we want to print a char it is not a problem?
+		//should this be in flag parser or here? I put the code below but dont how to write it then on the table
+		u_char flag;
+#define TH_FIN 0x01
+#define TH_SYN 0x02
+#define TH_RST 0x04
+#define TH_PUSH 0x08
+#define TH_ACK 0x10
+#define TH_URG 0x20
+#define TH_ECE 0x40
+#define TH_CWR 0x80
+#define FLAG (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG|TH_ECE|TH_CWR)
+		
+		if (flag_table->entries[idx].th_flags & TH_ECE){
+			flag = E;
+		}
+		if (flag_table->entries[idx].th_flags & TH_RST){
+			flag = R;
+		}
+		if (flag_table->entries[idx].th_flags & TH_CWR){
+			flag = C;
+		}if (flag_table->entries[idx].th_flags & TH_URG){
+			flag = U;
+		}if (flag_table->entries[idx].th_flags & TH_ACK){
+			flag = A;
+		}if (flag_table->entries[idx].th_flags & TH_PUSH){
+			flag = P;
+		}if (flag_table->entries[idx].th_flags & TH_SYN){
+			flag = S;
+		}if (flag_table->entries[idx].th_flags & TH_FIN){
+			flag = F;
+		}
+		
 		if (!gzprintf(handle,
-					  "%" PRIu16 " 0 %s \n",
+					  //FABIAN: The flags are not a
+					  //sting -> %s will not work
+					  //AHLEM ok changed
+					  "%" PRIu16 "%"  PRIu8 "\n",
 					  flag_table->entries[idx].flow_id,
-					  flag_table->entries[idx].th_flags)){
+					  flag_table->entries[idx].th_flags = flag)){
 			perror("Error writing update");
 			return -1;
 		}

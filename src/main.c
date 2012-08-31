@@ -126,13 +126,10 @@ static uint16_t get_flow_entry_for_packet(
     int* const http_bytes_len
 #endif
 #ifdef ENABLE_PACKET_SEQACK 
-	,u_char** const seq_bytes,
-	int* const seq_bytes_len,
-	u_char** const ack_bytes,
-	int* const ack_bytes_len									  
+	,uint32_t* int seq_bytes,
+	uint32_t* const ack_bytes									  
 #ifdef ENABLE_FLOW
-	,u_char** const flag_bytes,
-	int* const flag_bytes_len									  
+	,uint8_t* int flag_bytes,
 #endif												  
 										  
 ) {
@@ -157,8 +154,7 @@ static uint16_t get_flow_entry_for_packet(
         &address_table, entry->ip_source, eth_header->ether_shost);
     address_table_lookup(
         &address_table, entry->ip_destination, eth_header->ether_dhost);
-	  /*PUT FLAG PROCESSING AFTER HERE AHLEM*/
-    if (ip_header->protocol == IPPROTO_TCP) {
+		if (ip_header->protocol == IPPROTO_TCP) {
       const struct tcphdr* tcp_header = (struct tcphdr*)(
           (void *)ip_header + ip_header->ihl * sizeof(uint32_t));
       entry->port_source = ntohs(tcp_header->source);
@@ -172,9 +168,12 @@ static uint16_t get_flow_entry_for_packet(
        * http_bytes_len = cap_length - (*http_bytes - bytes);
       }                   
 #endif
-#ifdef ENABLE_PACKET_SEQACK 
-entry->th_seq = tcp_header->seq;
-entry->th_ack = tcp_header->ack;		
+#ifdef ENABLE_PACKET_SEQACK //AHLEM changed to what defined up
+			seq_bytes = tcp_header->seq;
+			ack_bytes = tcp_header->ack;		
+#endif
+#ifdef ENABLE_FLOW_FLAGS
+			flag_bytes = tcp_header->th_flags;				
 #endif
     } else if (ip_header->protocol == IPPROTO_UDP) {
       const struct udphdr* udp_header = (struct udphdr*)(
@@ -197,9 +196,6 @@ entry->th_ack = tcp_header->ack;
   return ether_type;
 }
 
-const struct seqackstruct * mydata = malloc(sizeof(seqackstruct));
-seqackstruct->th_seq = tcp_header->seq;
-seqackstruct->th_ack = tcp_header->ack;
 
 /* libpcap calls this function for every packet it receives. */
 static void process_packet(
@@ -241,14 +237,11 @@ static void process_packet(
   int http_bytes_len = -1;
 #endif
 #ifdef ENABLE_PACKET_SEQACK
-	u_char* seq_bytes = 0;
-	int seq_bytes_len = 0;
-	u_char* seq_bytes = 0;
-	int seq_bytes_len = 0;
+	uint32_t* int seq_bytes = 0; 
+	uint32_t* int ack_bytes = 0;
 #endif	
 #ifdef ENABLE_FLOW_FLAGS
-	u_char* flag_bytes = NULL;
-	int flag_bytes_len = -1;
+	uint8_t* int flag_bytes = 0;
 #endif
   int ether_type = get_flow_entry_for_packet(
       bytes, header->caplen, header->len, &flow_entry, &mac_id, &dns_bytes, &dns_bytes_len
@@ -256,11 +249,11 @@ static void process_packet(
       , &http_bytes, &http_bytes_len
 #endif
 #ifdef ENABLE_FLOW_FLAGS        
-	, &flag_bytes, &flag_bytes_len
+	, &flag_bytes
 #endif
 #ifdef ENABLE_PACKET_SEQACK
-	 , &seq_bytes, &seq_bytes_len,
-	, &ack_bytes, &ack_bytes_len
+	 , &seq_bytes 
+	 , &ack_bytes
 #endif											 
       );
   uint16_t flow_id;
@@ -282,7 +275,7 @@ static void process_packet(
 #ifndef NDEBUG
         if (flow_id == FLOW_ID_ERROR) {
           fprintf(stderr, "Error adding to flow table\n");
-        }
+        //AHLEM question 8
 #endif
       }
       break;
@@ -294,7 +287,7 @@ static void process_packet(
       break;
     case ETHERTYPE_REVARP:
       flow_id = FLOW_ID_REVARP;
-      break;
+      break; 
     default:
       flow_id = FLOW_ID_ERROR;
       break;
@@ -315,21 +308,36 @@ static void process_packet(
   if (http_bytes_len > 0) {
     process_http_packet(http_bytes, http_bytes_len, & http_table, flow_id);
   }
-#endif
+#endif 
+		  //FABIAN: for both seq/ack and flags you should check here for TCP.
+		  //the info is here accesible via flow_entry->transport_protocol,
+		  //AHLEM if the protocl is not TCP set the seq , ack and flags to 0 (even if they are initialized to 0 before?)
+		  //didnt add the else case because it will be field by the process_* (add_* function)to add the seq , ack or flag
 #ifdef ENABLE_PACKET_SEQACK
-	if (seq_bytes_len > 0 && packet_id >= 0) {
-		process_seq_packet(seq_bytes, seq_bytes_len, &seqack_table, packet_id);
+		  if (flow_entry->transport_protocol <> IPPROTO_TCP) {
+			  seq_bytes = -1;
+			  ack_bytes = -1;
+			}
+#endif
+#ifdef ENABLE_FLOW_FLAGS
+		  if (flow_entry->transport_protocol <> IPPROTO_TCP) {
+			  flag_bytes = -1;
+			}
+#endif	  
+#ifdef ENABLE_PACKET_SEQACK 
+		  //AHLEM changed the condition from parameter_len to the right field <> -1. Basically, if the protcol is TCP do that )
+	if (seq_bytes <> -1  && packet_id >= 0) {
+		process_seq_packet(seq_bytes, &seqack_table, packet_id);
 	}
-	if (ack_bytes_len > && packet_id >= 0) {
-		process_ack_packet(ack_bytes, ack_bytes_len, &seqack_table, packet_id);
+	if (ack_bytes <> -1 && packet_id >= 0) {
+		process_ack_packet(ack_bytes, &seqack_table, packet_id);
 	}
 #endif
 #ifdef ENABLE_FLOW_FLAGS
-	if (flag_bytes_len > 0) {
-		process_flag_packet(flag_bytes, flag_bytes_len, &flag_table, flow_id);
+	if (flag_bytes <> -1) {
+		process_flag_packet(flag_bytes, &flag_table, flow_id);
 	}
 #endif
-/*put the code to logically AND the flags somewhere around line 268 AHLEM*/
   if (sigprocmask(SIG_UNBLOCK, &block_set, NULL) < 0) {
     perror("sigprocmask");
     exit(1);
@@ -461,12 +469,10 @@ static void write_update() {
   http_table_init(&http_table);
 #endif	
 #ifdef ENABLE_PACKET_SEQACK
-	seqack_table_destroy(&seqack_table);
-	seqack_table_init(&seqack_table); 	
+		seqack_table_init(&seqack_table); 	
 #endif	
 #ifdef ENABLE_FLOW_FLAGS
-	flag_table_destroy(&flag_table);
-	flag_table_init(&flag_table);	
+		flag_table_init(&flag_table);	
 #ifdef	
   drop_statistics_init(&drop_statistics);
 }
