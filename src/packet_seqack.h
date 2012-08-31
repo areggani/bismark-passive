@@ -37,7 +37,7 @@ typedef struct{
 
 void seqack_table_init(seqack_table_t* const table);
 
-/
+
 /*Add a new seqack_entry record to the table */
 int seqack_table_add(seqack_table_t* const table, seqack_entry_t* const entry);
 
