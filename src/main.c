@@ -168,9 +168,9 @@ static uint16_t get_flow_entry_for_packet(
        * http_bytes_len = cap_length - (*http_bytes - bytes);
       }                   
 #endif
-#ifdef ENABLE_PACKET_SEQACK //AHLEM changed to what defined up
-			seq_bytes = tcp_header->th_seq;
-			ack_bytes = tcp_header->th_ack;		
+#ifdef ENABLE_PACKET_SEQACK //AHLEM changed to what defined up and it is not seq ack and flags and not th_*
+			seq_bytes = tcp_header->seq;
+			ack_bytes = tcp_header->ack;		
 #endif
 #ifdef ENABLE_FLOW_FLAGS
 			flag_bytes = tcp_header->th_flags;				
@@ -311,9 +311,8 @@ static void process_packet(
 		  //the info is here accesible via flow_entry->transport_protocol,
 		  //AHLEM if the protocl is not TCP set the seq , ack and flags to 0 (even if they are initialized to 0 before?)
 		  //didnt add the else case because it will be field by the process_* (add_* function)to add the seq , ack or flag
-		  //sure flow_entry-> not entry->transport_protocol or ip_header->protocol
 #ifdef ENABLE_PACKET_SEQACK
-		  if (entry->transport_protocol <> IPPROTO_TCP) {//AHLEM fabian thinks should be ==
+		  if (flow_entry->transport_protocol <> IPPROTO_TCP) {//AHLEM fabian thinks should be ==
 			  seq_bytes = -1;
 			  ack_bytes = -1;
 			}
@@ -427,7 +426,7 @@ static void write_update() {
 #endif
   if (packet_series_write_update(&packet_data, handle)
 #ifdef ENABLE_PACKET_SEQACK  
-	  || seqack_table_write_update(&packet_seqack, handle) 
+	  || seqack_table_write_update(&seqack_table, handle) 
 #endif	  
       || flow_table_write_update(&flow_table, handle)
 #ifdef ENABLE_FLOW_FLAGS
