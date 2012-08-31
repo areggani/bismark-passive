@@ -21,13 +21,13 @@ static void add_seqack_packet(seqack_table_t* seqack_table,
   entry.packet_id = packet_id;
   entry.th_seq = th_seq;
   entry.th_ack = th_ack;
-  seqack_table_add(dns_table, &entry);
+  seqack_table_add(seqack_table, &entry);
 }
 
 /*process the seq and ack before adding the record*/
 //AHLEM do I need to check for something before adding the seq and ack or do I simply need the add function?
 int process_seqack_packet(const uint8_t* const bytes,
-                       int len,
+                          int len,
 						  dseqack_table_t* const seqack_table,
 						  uint16_t packet_id);
 {

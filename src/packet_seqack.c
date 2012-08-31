@@ -26,7 +26,7 @@ int seqack_table_write_update(//
 							  //FABIAN: this does not look right having two const
 							  //statements in their. The first one is likely wrong.
 							  //AHLEM Why is this wrong? we write an entry in the table format
-							  const seqack_table_t* const table,
+							  seqack_table_t* const table,
                                gzFile handle) {
 	//FABIAN: You should maybe also print a trailing line with status,
 	//like in dns_table.c, line 50-56

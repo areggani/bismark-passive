@@ -30,10 +30,10 @@ typedef struct {
 typedef struct{
 	
 	seqack_entry_t entries[SEQACK_TABLE_ENTRIES];
-	int length
+	int length;
 	int num_dropped_entries;
 
-}seqack_table_t
+}seqack_table_t;
 
 void seqack_table_init(seqack_table_t* const table);
 
@@ -43,6 +43,6 @@ int seqack_table_add(seqack_table_t* const table, seqack_entry_t* const entry);
 
 
 /* Serialize all table data to an open gzFile handle. */
-int seqack_table_write_update(const seqack_table_t const table, gzFile handle); 
+int seqack_table_write_update(seqack_table_t const table, gzFile handle); 
 
 #endif

@@ -126,13 +126,13 @@ static uint16_t get_flow_entry_for_packet(
     int* const http_bytes_len
 #endif
 #ifdef ENABLE_PACKET_SEQACK 
-	,uint32_t* int seq_bytes,
-	uint32_t* const ack_bytes									  
-#ifdef ENABLE_FLOW
-	,uint8_t* int flag_bytes,
+	,uint32_t* seq_bytes,
+	uint32_t* ack_bytes
+#endif									  
+#ifdef ENABLE_FLOW_FLAGS
+	,uint8_t* flag_bytes,
 #endif												  
-										  
-) {
+	) {
   const struct ether_header* const eth_header = (struct ether_header*)bytes;
   uint16_t ether_type = ntohs(eth_header->ether_type);
 #ifdef ENABLE_FREQUENT_UPDATES
@@ -169,8 +169,8 @@ static uint16_t get_flow_entry_for_packet(
       }                   
 #endif
 #ifdef ENABLE_PACKET_SEQACK //AHLEM changed to what defined up
-			seq_bytes = tcp_header->seq;
-			ack_bytes = tcp_header->ack;		
+			seq_bytes = tcp_header->th_seq;
+			ack_bytes = tcp_header->th_ack;		
 #endif
 #ifdef ENABLE_FLOW_FLAGS
 			flag_bytes = tcp_header->th_flags;				
@@ -202,8 +202,7 @@ static void process_packet(
         u_char* const user,
         const struct pcap_pkthdr* const header,
 		const u_char* const bytes) {
-	const struct seqackstruct * mydata = (seqackstruct *)user;
-  if (sigprocmask(SIG_BLOCK, &block_set, NULL) < 0) {
+	  if (sigprocmask(SIG_BLOCK, &block_set, NULL) < 0) {
     perror("sigprocmask");
     exit(1);
   }
@@ -237,11 +236,11 @@ static void process_packet(
   int http_bytes_len = -1;
 #endif
 #ifdef ENABLE_PACKET_SEQACK
-	uint32_t* int seq_bytes = 0; 
-	uint32_t* int ack_bytes = 0;
+	uint32_t* seq_bytes = 0; 
+	uint32_t* ack_bytes = 0;
 #endif	
 #ifdef ENABLE_FLOW_FLAGS
-	uint8_t* int flag_bytes = 0;
+	uint8_t* flag_bytes = 0;
 #endif
   int ether_type = get_flow_entry_for_packet(
       bytes, header->caplen, header->len, &flow_entry, &mac_id, &dns_bytes, &dns_bytes_len
@@ -275,7 +274,6 @@ static void process_packet(
 #ifndef NDEBUG
         if (flow_id == FLOW_ID_ERROR) {
           fprintf(stderr, "Error adding to flow table\n");
-        //AHLEM question 8
 #endif
       }
       break;
@@ -306,15 +304,16 @@ static void process_packet(
   }
 #ifdef ENABLE_HTTP_URL
   if (http_bytes_len > 0) {
-    process_http_packet(http_bytes, http_bytes_len, & http_table, flow_id);
+    process_http_packet(http_bytes, http_bytes_len, &http_table, flow_id);
   }
 #endif 
 		  //FABIAN: for both seq/ack and flags you should check here for TCP.
 		  //the info is here accesible via flow_entry->transport_protocol,
 		  //AHLEM if the protocl is not TCP set the seq , ack and flags to 0 (even if they are initialized to 0 before?)
 		  //didnt add the else case because it will be field by the process_* (add_* function)to add the seq , ack or flag
+		  //sure flow_entry-> not entry->transport_protocol or ip_header->protocol
 #ifdef ENABLE_PACKET_SEQACK
-		  if (flow_entry->transport_protocol <> IPPROTO_TCP) {
+		  if (entry->transport_protocol <> IPPROTO_TCP) {//AHLEM fabian thinks should be ==
 			  seq_bytes = -1;
 			  ack_bytes = -1;
 			}
@@ -325,17 +324,16 @@ static void process_packet(
 			}
 #endif	  
 #ifdef ENABLE_PACKET_SEQACK 
-		  //AHLEM changed the condition from parameter_len to the right field <> -1. Basically, if the protcol is TCP do that )
+		  //AHLEM changed the condition from parameter_len to the right field <> -1. Basically, if the protcol is TCP do that (seq_bytes <> -1 or ack_bytes <> -1 is the same) )
 	if (seq_bytes <> -1  && packet_id >= 0) {
-		process_seq_packet(seq_bytes, &seqack_table, packet_id);
+		process_seqack_packet(seq_bytes, ack_bytes, &seqack_table, packet_id);
 	}
-	if (ack_bytes <> -1 && packet_id >= 0) {
-		process_ack_packet(ack_bytes, &seqack_table, packet_id);
-	}
+	
 #endif
-#ifdef ENABLE_FLOW_FLAGS
-	if (flag_bytes <> -1) {
-		process_flag_packet(flag_bytes, &flag_table, flow_id);
+#ifdef ENABLE_FLOW_FLAGS /*if TCP and flow acceptance*/
+		  //AHLEM need the variable length in the flag_parser.c (see process dns and process http up)but as we deleted it!?!
+	if (flag_bytes <> -1 && flow_id <> FLOW_ID_ERROR) {
+		process_flag_packet(flag_bytes, flag_table.length, &flag_table, flow_id);
 	}
 #endif
   if (sigprocmask(SIG_UNBLOCK, &block_set, NULL) < 0) {
@@ -433,7 +431,7 @@ static void write_update() {
 #endif	  
       || flow_table_write_update(&flow_table, handle)
 #ifdef ENABLE_FLOW_FLAGS
-	  || flag_table_write_update(&flow_flag,handle)	
+	  || flag_table_write_update(&flag_table,handle)	
 #endif
       || dns_table_write_update(&dns_table, handle)
       || address_table_write_update(&address_table, handle)
@@ -473,7 +471,7 @@ static void write_update() {
 #endif	
 #ifdef ENABLE_FLOW_FLAGS
 		flag_table_init(&flag_table);	
-#ifdef	
+#endif	
   drop_statistics_init(&drop_statistics);
 }
 
@@ -697,9 +695,8 @@ int main(int argc, char *argv[]) {
 #endif	
 #ifdef ENABLE_FLOW_FLAGS
 	flag_table_init(&flag_table);	
-#ifdef	
-	
-  address_table_init(&address_table);
+#endif
+	address_table_init(&address_table);
   drop_statistics_init(&drop_statistics);
 #ifdef ENABLE_FREQUENT_UPDATES
   device_throughput_table_init(&device_throughput_table);
@@ -720,5 +717,5 @@ int main(int argc, char *argv[]) {
   if (!pcap_handle) {
     return 1;
   }
-  return pcap_loop(pcap_handle, -1, process_packet, mydata);
+  return pcap_loop(pcap_handle, -1, process_packet, NULL);
 }

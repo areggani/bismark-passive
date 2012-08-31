@@ -52,9 +52,11 @@ SRCS = \
 	$(SRC_DIR)/drop_statistics.c \
 	$(SRC_DIR)/flow_table.c \
 	$(SRC_DIR)/flow_flag.c \
+	$(SRC_DIR)/flag_parser.c \
 	$(SRC_DIR)/main.c \
 	$(SRC_DIR)/packet_series.c \
 	$(SRC_DIR)/packet_seqack.c \
+	$(SRC_DIR)/seqack_parser.c \
 	$(SRC_DIR)/sha1.c \
 	$(SRC_DIR)/upload_failures.c \
 	$(SRC_DIR)/util.c \
