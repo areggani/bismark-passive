@@ -130,7 +130,7 @@ static uint16_t get_flow_entry_for_packet(
 	uint32_t* ack_bytes
 #endif									  
 #ifdef ENABLE_FLOW_FLAGS
-	,uint8_t* flag_bytes,
+	,uint8_t* flag_bytes
 #endif												  
 	) {
   const struct ether_header* const eth_header = (struct ether_header*)bytes;
@@ -168,12 +168,12 @@ static uint16_t get_flow_entry_for_packet(
        * http_bytes_len = cap_length - (*http_bytes - bytes);
       }                   
 #endif
-#ifdef ENABLE_PACKET_SEQACK //AHLEM changed to what defined up and it is not seq ack and flags and not th_*
-			seq_bytes = tcp_header->seq;
-			ack_bytes = tcp_header->ack;		
+#ifdef ENABLE_PACKET_SEQACK 
+			* seq_bytes = tcp_header->seq;
+			* ack_bytes = tcp_header->ack_ack;		
 #endif
-#ifdef ENABLE_FLOW_FLAGS
-			flag_bytes = tcp_header->th_flags;				
+#ifdef ENABLE_FLOW_FLAGS//AHLEM chnage flag structure depending on definition
+			* flag_bytes = tcp_header->th_flags;				
 #endif
     } else if (ip_header->protocol == IPPROTO_UDP) {
       const struct udphdr* udp_header = (struct udphdr*)(
@@ -240,6 +240,7 @@ static void process_packet(
 	uint32_t* ack_bytes = 0;
 #endif	
 #ifdef ENABLE_FLOW_FLAGS
+	//AHLEM change the type to the structure th_flags
 	uint8_t* flag_bytes = 0;
 #endif
   int ether_type = get_flow_entry_for_packet(
@@ -274,6 +275,7 @@ static void process_packet(
 #ifndef NDEBUG
         if (flow_id == FLOW_ID_ERROR) {
           fprintf(stderr, "Error adding to flow table\n");
+		}
 #endif
       }
       break;
@@ -307,32 +309,30 @@ static void process_packet(
     process_http_packet(http_bytes, http_bytes_len, &http_table, flow_id);
   }
 #endif 
-		  //FABIAN: for both seq/ack and flags you should check here for TCP.
-		  //the info is here accesible via flow_entry->transport_protocol,
-		  //AHLEM if the protocl is not TCP set the seq , ack and flags to 0 (even if they are initialized to 0 before?)
-		  //didnt add the else case because it will be field by the process_* (add_* function)to add the seq , ack or flag
+		  /*check for TCP*/
+		//didnt add the else case because it will be field by the process_* (add_* function)to add the seq , ack or flag
 #ifdef ENABLE_PACKET_SEQACK
-		  if (flow_entry->transport_protocol <> IPPROTO_TCP) {//AHLEM fabian thinks should be ==
+		  if (flow_entry->transport_protocol != IPPROTO_TCP) {
 			  seq_bytes = -1;
 			  ack_bytes = -1;
 			}
 #endif
 #ifdef ENABLE_FLOW_FLAGS
-		  if (flow_entry->transport_protocol <> IPPROTO_TCP) {
+		  if (flow_entry->transport_protocol != IPPROTO_TCP) { //use another variable or put directly flow_entry->transport_protocol <> IPPROTO_TCP down in process
 			  flag_bytes = -1;
 			}
 #endif	  
 #ifdef ENABLE_PACKET_SEQACK 
-		  //AHLEM changed the condition from parameter_len to the right field <> -1. Basically, if the protcol is TCP do that (seq_bytes <> -1 or ack_bytes <> -1 is the same) )
+		  /* Basically, if the protcol is TCP do that (seq_bytes <> -1 or ack_bytes <> -1 is the same) )*/
 	if (seq_bytes <> -1  && packet_id >= 0) {
-		process_seqack_packet(seq_bytes, ack_bytes, &seqack_table, packet_id);
+		]=xxx 
+		process_seqack_packet(&seqack_table, packet_id, th_seq, th_ack);
 	}
 	
 #endif
 #ifdef ENABLE_FLOW_FLAGS /*if TCP and flow acceptance*/
-		  //AHLEM need the variable length in the flag_parser.c (see process dns and process http up)but as we deleted it!?!
-	if (flag_bytes <> -1 && flow_id <> FLOW_ID_ERROR) {
-		process_flag_packet(flag_bytes, flag_table.length, &flag_table, flow_id);
+	if (flag_bytes != -1 && flow_id != FLOW_ID_ERROR) {
+		process_flag_packet(flag_bytes, &flag_table, flow_id);
 	}
 #endif
   if (sigprocmask(SIG_UNBLOCK, &block_set, NULL) < 0) {

@@ -11,7 +11,7 @@
 #include <arpa/nameser.h>
 #include "anonymization.h"
 
-
+//change flags structure sturct th_flags
 int add_flag(flag_table_t* flag_table,
                          uint16_t flow_id,
                          uint8_t th_flags)
@@ -30,21 +30,21 @@ return 0;
 //packet belongs to a flow that has been added already
 //AHLEM ok, if the flow id doent exist insert if then update
 
-int process_flag_packet(const uint8_t* const bytes,
-                       int len,
-                       flag_table_t* const flag_table,
+int process_flag_packet(const uint8_t* const flag_bytes,
+						flag_table_t* const flag_table,
                        uint16_t flow_id)
 {   int idx
-	for (idx = 0; idx < flag_table->len; ++idx)
+	for (idx = 0; idx < flag_table->length; ++idx)
 	{ 
-		if (flag_table->entries[idx].flow_id <> flow_id ) {
-			add_flag(flag_table, flow_id, th_flag);
-		}else {
-			//AHLEM how to exactly update ? do and & with the previous value?
-			flag_table->entries[idx].th_flag =  ;
-			}
+		if (flag_table->entries[idx].flow_id == flow_id ) {
+	  /*logical AND between previous and new flag*/				
+				flag_table->entries[idx].th_flag = (flag_table->entries[idx].th_flag && flag_bytes) ;
+		}
+		break; 
 	}
+			add_flag(flag_table, flow_id, th_flag);//if not there add
+	
   
   return 0;
 }
-#endif
+#endif  

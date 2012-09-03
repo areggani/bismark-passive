@@ -37,51 +37,33 @@ int flag_table_write_update(flag_table_t* const flag_table, gzFile handle) {
 	}
 	int idx;
 	for (idx = 0; idx < flag_table->length; ++idx) {
-		//Actually you should think how
-		//to print out the flags, maybe
-		//encode the different flags
-		//with a letter:
-		//e.g.
-		//SYN=S,ACK=A,FIN=F,RST=R,Push=P,...
-		//Then a flow with SYN,ACK and
-		//FIN will be encoded as SAF
-		//AHLEM but the flag is 8bit int and we want to print a char it is not a problem?
-		//should this be in flag parser or here? I put the code below but dont how to write it then on the table
-		u_char flag;
-#define TH_FIN 0x01
-#define TH_SYN 0x02
-#define TH_RST 0x04
-#define TH_PUSH 0x08
-#define TH_ACK 0x10
-#define TH_URG 0x20
-#define TH_ECE 0x40
-#define TH_CWR 0x80
-#define FLAG (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG|TH_ECE|TH_CWR)
+			
+		uint8_t flag;
 		
-		if (flag_table->entries[idx].th_flags & TH_ECE){
+		if ((flag = flag_table->entries[idx].th_flags) & (TH_SYN|TH_FIN|TH_RST|TH_PUSH)) {
+		
+		if (flag & TH_ECE) {
 			flag = E;
-		}
-		if (flag_table->entries[idx].th_flags & TH_RST){
+		}if (flag & TH_RST){
 			flag = R;
-		}
-		if (flag_table->entries[idx].th_flags & TH_CWR){
+		}if (flag & TH_CWR){
 			flag = C;
-		}if (flag_table->entries[idx].th_flags & TH_URG){
+		}if (flag & TH_URG){
 			flag = U;
-		}if (flag_table->entries[idx].th_flags & TH_ACK){
+		}if (flag & TH_ACK){
 			flag = A;
-		}if (flag_table->entries[idx].th_flags & TH_PUSH){
+		}if (flag & TH_PUSH){
 			flag = P;
-		}if (flag_table->entries[idx].th_flags & TH_SYN){
+		}if (flag & TH_SYN){
 			flag = S;
-		}if (flag_table->entries[idx].th_flags & TH_FIN){
+		}if (flag & TH_FIN){
 			flag = F;
 		}
+			
+	} else
+			flag = NONE;
 		
 		if (!gzprintf(handle,
-					  //FABIAN: The flags are not a
-					  //sting -> %s will not work
-					  //AHLEM ok changed
 					  "%" PRIu16 "%"  PRIu8 "\n",
 					  flag_table->entries[idx].flow_id,
 					  flag_table->entries[idx].th_flags = flag)){
