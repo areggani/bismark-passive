@@ -7,8 +7,7 @@
 
 /* Parse a packet and add relevent entries to the provided flow
  * table. */
-int process_flag_packet(const uint8_t* const bytes,
-                       int len, 
+int process_flag_packet(uint8_t* flag_bytes,
                        flag_table_t* const flag_table,
                        uint16_t flow_id);
 

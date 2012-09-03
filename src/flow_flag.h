@@ -12,7 +12,7 @@
 
 typedef struct { 
 	uint8_t th_flags;     
-    uint16_t flow_id;
+    	uint16_t flow_id;
   
 } flow_flag_entry_t;  
 
@@ -31,3 +31,5 @@ int flag_table_add(flag_table_t* const flag_table, flow_flag_entry_t* const entr
 
 /* Serialize all table data to an open gzFile handle. */
 int flag_table_write_update(flag_table_t* const flag_table, gzFile handle);
+
+#endif
