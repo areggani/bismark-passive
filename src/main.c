@@ -61,7 +61,6 @@
 
 
 static pcap_t* pcap_handle = NULL;
-
 static packet_series_t packet_data;
 static flow_table_t flow_table;
 static dns_table_t dns_table;
@@ -118,6 +117,9 @@ static uint16_t get_flow_entry_for_packet(
     int cap_length,
     int full_length,
     flow_table_entry_t* const entry,
+	#ifdef ENABLE_FLOW_FLAGS /* flow flag structure*/
+	flow_flag_entry_t* const flags,
+	#endif								  
 	int* const mac_id,
     u_char** const dns_bytes,
     int* const dns_bytes_len
@@ -130,7 +132,7 @@ static uint16_t get_flow_entry_for_packet(
 	uint32_t* ack_bytes
 #endif									  
 #ifdef ENABLE_FLOW_FLAGS
-	,uint8_t* flag_bytes
+	,struct th_flags flags
 #endif												  
 	) {
   const struct ether_header* const eth_header = (struct ether_header*)bytes;
@@ -172,8 +174,14 @@ static uint16_t get_flow_entry_for_packet(
 			* seq_bytes = tcp_header->seq;
 			* ack_bytes = tcp_header->ack_ack;		
 #endif
-#ifdef ENABLE_FLOW_FLAGS//AHLEM chnage flag structure depending on definition
-			* flag_bytes = tcp_header->th_flags;				
+#ifdef ENABLE_FLOW_FLAGS/*changed flags structure see flow_flag.h*/
+			* flags->fin = tcp_header->fin;
+			* flags->syn = tcp_header-syn;
+			* flags->rst = tcp_header->rst;
+			* flags->psh = tcp_header->psh;
+			* flags->ack = tcp_header->ack;
+			* flags->urg = tcp_header->urg;
+			* flags->res2 = tcp_header->res2;
 #endif
     } else if (ip_header->protocol == IPPROTO_UDP) {
       const struct udphdr* udp_header = (struct udphdr*)(
@@ -240,8 +248,7 @@ static void process_packet(
 	uint32_t* ack_bytes = 0;
 #endif	
 #ifdef ENABLE_FLOW_FLAGS
-	//AHLEM change the type to the structure th_flags
-	uint8_t* flag_bytes = 0;
+	struct th_flags flag_bytes = 0;
 #endif
   int ether_type = get_flow_entry_for_packet(
       bytes, header->caplen, header->len, &flow_entry, &mac_id, &dns_bytes, &dns_bytes_len

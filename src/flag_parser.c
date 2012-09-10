@@ -13,8 +13,7 @@
 
 int add_flag(flag_table_t* flag_table,
                          uint16_t flow_id,
-                         uint8_t th_flags)
-                         {
+                         struct th_flags th_flags){
   flow_flag_entry_t entry;
   entry.flow_id = flow_id;
   entry.th_flags = th_flags;
@@ -29,14 +28,14 @@ return 0;
 //packet belongs to a flow that has been added already
 //AHLEM ok, if the flow id doent exist insert if then update
 
-int process_flag_packet(uint8_t* flag_bytes,
-			flag_table_t* const flag_table,
-                       uint16_t flow_id)
+int process_flag_packet(struct th_flags flag_bytes,
+						flag_table_t* const flag_table,
+						uint16_t flow_id)
 {   int idx;
 	for (idx = 0; idx < flag_table->length; ++idx){ 
 		if (flag_table->entries[idx].flow_id == flow_id ) {
 	  /*logical AND between previous and new flag*/				
-				flag_table->entries[idx].th_flags = (flag_table->entries[idx].th_flags && flag_bytes) ;
+				flag_table->entries[idx].th_flags = ((flag_table->entries[idx].th_flags) && flag_bytes);
 		}
 		break; 
 	}
